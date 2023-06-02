@@ -1,50 +1,60 @@
 import re
 import random
-import pyttsx3
-
-def convert_text_to_speech(text):
-    engine = pyttsx3.init()
-    engine.setProperty('voice', 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0')  # Setze die gewünschte Stimme auf Englisch
-    engine.setProperty('volume', 1.0)  # Setze die Lautstärke auf 0.8 (80%)
-    engine.setProperty('rate', 200)  # Setze die Sprechgeschwindigkeit auf 150 (Standard: 200)
-    engine.say(text)
-    engine.runAndWait()
-    # voices = engine.getProperty('voices')
-    # for voice in voices:
-    #     print(voice, voice.id)
-    #     engine.setProperty('voice', voice.id)
-    #     engine.say("Hello World!")
-    #     engine.runAndWait()
-    #     # engine.stop()
-
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 
 class SimpleChatBot:
     def __init__(self, pairs, reflections):
         self.pairs = pairs
         self.reflections = reflections
+        self.vectorizer = CountVectorizer()
+        self.classifier = None
 
     def _reflect(self, phrase):
         tokens = phrase.lower().split()
         tokens = [self.reflections.get(token, token) for token in tokens]
         return ' '.join(tokens)
 
+    def _prepare_data(self, pairs):
+        X = []
+        y = []
+        for pattern, _ in pairs:
+            X.append(pattern)
+            y.append(pattern)
+        return X, y
+
+    def _train_classifier(self, X, y):
+        X_vectorized = self.vectorizer.fit_transform(X)
+        self.classifier = MultinomialNB()  # Naive Bayes Classifier
+        # self.classifier = SVC()  # Support Vector Machines Classifier
+        # self.classifier = DecisionTreeClassifier()  # Decision Trees Classifier
+        self.classifier.fit(X_vectorized, y)
+
     def _match_and_respond(self, statement):
+        statement_vectorized = self.vectorizer.transform([statement])
+        predicted_intent = self.classifier.predict(statement_vectorized)[0]
+
         for pattern, responses in self.pairs:
-            match = re.match(pattern, statement.rstrip(".!"))
-            if match:
+            if pattern == predicted_intent:
                 response = random.choice(responses)
                 if "%1" in response:
-                    response = response.replace("%1", self._reflect(match.group(1)))
+                    response = response.replace("%1", self._reflect(statement))
                 return response
         return None
 
     def add_pairs(self, new_pairs):
         self.pairs.extend(new_pairs)
 
+    def train(self):
+        X, y = self._prepare_data(self.pairs)
+        self._train_classifier(X, y)
+
     def respond_to(self, statement):
         response = self._match_and_respond(statement)
         if response is None:
-            return "I am sorry, I did not understand that."
+            return "I'm sorry, I didn't understand that."
         else:
             return response
 
@@ -65,17 +75,13 @@ reflections = {
     "was": "were",
     "i": "you",
     "i'm": "you are",
-    "i am": "you are",
     "i'd": "you would",
     "i've": "you have",
-    "i have": "you have",
     "i'll": "you will",
-    "i will": "you will",
     "my": "your",
     "you are": "I am",
     "you were": "I was",
     "you've": "I have",
-    "you have": "I have",
     "you'll": "I will",
     "your": "my",
     "yours": "mine",
@@ -96,16 +102,9 @@ new_pairs = [
 ]
 
 chatbot.add_pairs(new_pairs)
+chatbot.train()
 
 inputstr = ""
 while inputstr != "quit":
     inputstr = input("> ")
-    if  inputstr == "settings":
-        print("Settings:");
-        convert_text_to_speech("")
-    else:
-        responseis = chatbot.respond_to(inputstr)
-        strresponseis = str(responseis)
-        print(strresponseis)
-        convert_text_to_speech(strresponseis)
-
+    print(chatbot.respond_to(inputstr))
