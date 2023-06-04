@@ -1,2 +1,7 @@
 scikit-learn==0.24.2
 pyttsx3==2.90
+asyncio
+
+
+tensorflow
+keras
